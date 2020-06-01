@@ -1,0 +1,42 @@
+```java
+//必须先检测一下
+if (!Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+    Toast.makeText(MainActivity.this, "请插入SD", Toast.LENGTH_LONG).show();
+    return;
+} 
+
+File file = new File(Environment.getExternalStorageDirectory().
+                     toString() + "/test.xls");
+
+if (!file.exists()) {
+    try {
+        file.createNewFile();
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+
+}
+//接下来报错
+outputStream = new FileOutputStream(file);
+
+requestPermissions(
+    new String[]{
+        Manifest.permission.WRITE_EXTERNAL_STORAGE}, 0x11);
+//在申请权限后依然报错
+```
+
+# 解决办法
+
+参考——[Android学习之请求外部存储sd卡读写权限（适配Android8.0以上包含Android10.0）少花时间少踩坑！_移动开发_星河Dac-CSDN博客](https://blog.csdn.net/c529283955/article/details/104266083)
+
+```xml
+<application
+             android:allowBackup="true"
+             android:icon="@mipmap/ic_launcher"
+             android:label="@string/app_name"
+             android:requestLegacyExternalStorage="true"
+             android:roundIcon="@mipmap/ic_launcher"
+             android:supportsRtl="true"
+             android:theme="@style/AppTheme">
+```
+

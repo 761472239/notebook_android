@@ -1,0 +1,268 @@
+安卓开发中,初学阶段对于耗时操作一般都用子线程来实现,但是这种方式很不规范 , 
+
+**第一:** 子线程开的多了造成资源浪费; 
+
+**第二:** 由于子线程属于异步,主线程退出时该子线程可能还在执行,这就造成了内存泄漏
+
+所以, 子线程不能盲目的去使用, 这时 我们可以通过
+
+**使用 AsyncTask 来执行异步任务, 这样在Activity退出时** ==可以取消正在进行的任务==, ==避免了内存泄漏== ,而且==请求的过程可控== , 这使得更新UI变得异常便捷...
+
+# 1. 异步任务
+
+ 异步任务由在后台线程上运行的计算定义，并且其结果发布在UI线程上。异步任务是由3种一般类型，称为定义`Params`，`Progress`和`Result`，和4个步骤，称为`onPreExecute`，`doInBackground`， `onProgressUpdate`和`onPostExecute`。 
+
+**更方便更新UI元素**
+
+![1582904209446](assets/1582904209446.png)
+
+
+
+# 2. 作用
+
+1. 实现多线程
+    在工作线程中执行任务，如 耗时任务
+2. 异步通信、消息传递
+    **实现工作线程 & 主线程（`UI`线程）之间的通信**，即：将工作线程的执行结果传递给主线程，从而在主线程中执行相关的`UI`操作
+
+> 从而保证线程安全 ——[Android 多线程：手把手教你使用AsyncTask - 简书](https://www.jianshu.com/p/ee1342fcf5e7)
+
+# 3. 优点
+
+- 方便实现异步通信
+   不需使用 “任务线程（如继承`Thread`类） + `Handler`”的复杂组合
+- 节省资源
+   采用线程池的缓存线程 + 复用线程，避免了频繁创建 & 销毁线程所带来的系统资源开销
+
+# 4. 用法
+
+ 必须将AsyncTask子类化才能使用。子类将覆盖至少一个方法（`doInBackground(Params...)`），最常见的是将覆盖第二个方法（`onPostExecute(Result)`） 
+
+# 5. 类 & 方法介绍
+
+## 5.1 类
+
+```cpp
+public abstract class AsyncTask<Params, Progress, Result> { 
+ ... 
+}
+
+// 类中参数为3种泛型类型
+// 整体作用：控制AsyncTask子类执行线程任务时各个阶段的返回类型
+// 具体说明：
+    // a. Params：开始异步任务执行时传入的参数类型，对应excute（）中传递的参数
+    // b. Progress：异步任务执行过程中，返回下载进度值的类型
+    // c. Result：异步任务执行完成后，返回的结果类型，与doInBackground()的返回值类型保持一致
+// 注：
+    // a. 使用时并不是所有类型都被使用
+    // b. 若无被使用，可用java.lang.Void类型代替
+    // c. 若有不同业务，需额外再写1个AsyncTask的子类
+}
+```
+
+## 5.2 方法
+
+![img](assets/944365-153fb37764704129.webp)
+
+方法执行顺序
+
+![img](assets/944365-31df794006c69621.webp)
+
+# AsyncTask的通用类型
+
+异步任务使用的三种类型如下：
+
+1. `Params`，即执行时发送给任务的参数类型。
+2. `Progress`，即后台计算过程中发布的进度单位的类型。
+3. `Result`，是背景计算结果的类型。
+
+并非所有类型都总是由异步任务使用。要将类型标记为未使用，只需使用type `Void`：
+
+```java
+ private class MyTask extends AsyncTask<Void, Void, Void> { ... }
+ private class MyTask extends AsyncTask<Void, Integer, Boolean> { ... }
+```
+
+# 4个步骤
+
+当执行异步任务时，该任务将经历4个步骤：
+
+1. `onPreExecute()`，在执行任务之前在UI线程上调用。此步骤通常用于设置任务，例如，通过在用户界面中显示进度栏。
+
+2. `doInBackground(Params...)`，`onPreExecute()`执行完成后立即在后台线程上调用。此步骤用于执行可能需要很长时间的后台计算。异步任务的参数将传递到此步骤。计算结果必须通过此步骤返回，并将传递回最后一步。此步骤还可以`publishProgress(Progress...)`用于发布一个或多个进度单位。这些值在`onProgressUpdate(Progress...)`步骤中发布在UI线程上 。
+
+3. `onProgressUpdate(Progress...)`，对调用后在UI线程上调用`publishProgress(Progress...)`。执行的时间是不确定的。此方法用于在后台计算仍在执行时在用户界面中显示任何形式的进度。例如，它可用于为进度栏设置动画或在文本字段中显示日志。
+
+4. `onPostExecute(Result)`，在后台计算完成后在UI线程上调用。后台计算的结果作为参数传递到此步骤。
+
+   ```java
+   private class TestTask extends AsyncTask<Integer, Integer, String> {
+           // 准备工作
+           @Override
+           protected void onPreExecute() {
+               super.onPreExecute();
+               Log.d("TAG", "准备工作");
+           }
+   
+           // 执行异步任务，耗时工作，接受第一个参数，返回第三个参数
+           @Override
+           protected String doInBackground(Integer... integers) {
+               Log.d("TAG", "传进来数字" + integers[0]);
+               try {
+                   Thread.sleep(2000);
+               } catch (InterruptedException e) {
+                   e.printStackTrace();
+               }
+               // 通知主线程当前的进度是多少，主线程更新UI,调用onProgressUpdate，第二个参数 Integer
+               publishProgress(10);
+   
+               return "传进来数字:" + integers[0];
+           }
+           
+       	// 切换到主线程，更新UI，第二个参数 Integer
+           @Override
+           protected void onProgressUpdate(Integer... values) {
+               super.onProgressUpdate(values);
+           }
+   
+           // 切换到主线程中
+           @Override
+           protected void onPostExecute(String s) {
+               button.setText(s);
+           }
+       }
+   ```
+
+   
+
+# 取消任务
+
+可以随时通过调用取消任务`cancel(boolean)`。调用此方法将导致后续调用`isCancelled()`返回true。调用此方法后，将在 返回后调用`onCancelled(java.lang.Object)`，而不是 。为了确保尽快取消任务，如果可能的话，您应该始终定期检查from 的返回值（例如在循环内）
+
+`onPostExecute(java.lang.Object)`
+
+`doInBackground(java.lang.Object[])`
+
+`isCancelled()`
+
+`doInBackground(java.lang.Object[])`
+
+```java
+MyTask mTask = new MyTask();
+mTask.cancel(true);
+```
+
+
+
+# 注意事项
+
+为了使此类正常工作，必须遵循一些线程规则：
+
+- 必须在UI线程上加载AsyncTask类。从开始，此操作会自动完成`Build.VERSION_CODES.JELLY_BEAN`。
+- 必须在UI线程上创建任务实例。
+- `execute(Params...)` 必须在UI线程上调用。
+- 不要手动调用`onPreExecute()`，`onPostExecute(Result)`， `doInBackground(Params...)`，`onProgressUpdate(Progress...)`这几个方法。
+- 该任务只能执行一次（如果尝试第二次执行，则将引发异常。）
+
+##  关于 生命周期
+
+- 结论
+   `AsyncTask`不与任何组件绑定生命周期
+
+- 使用建议
+   在`Activity` 或 `Fragment`中使用 `AsyncTask`时，最好在`Activity` 或 `Fragment`的`onDestory()`调用 `cancel(boolean)`；
+
+## 关于 内存泄漏
+
+- 结论
+   若`AsyncTask`被声明为`Activity`的非静态内部类，当`Activity`需销毁时，会因`AsyncTask`保留对`Activity`的引用 而导致`Activity`无法被回收，最终引起内存泄露
+- 使用建议
+   `AsyncTask`应被声明为`Activity`的静态内部类
+
+## 线程任务执行结果 丢失
+
+- 结论
+   当`Activity`重新创建时（屏幕旋转 / `Activity`被意外销毁时后恢复），之前运行的`AsyncTask`（非静态的内部类）持有的之前`Activity`引用已无效，故复写的`onPostExecute()`将不生效，即无法更新UI操作
+- 使用建议
+   在`Activity`恢复时的对应方法 重启 任务线程
+
+# 记忆可观察性
+
+AsyncTask保证所有回调都已同步，以确保以下操作没有显式同步。
+
+- 的记忆效应`onPreExecute()`以及在呼叫之前执行的任何其他动作`execute(Params...)`，包括AsyncTask对象的构造，对都是可见的`doInBackground(Params...)`。
+- 的记忆效应对`doInBackground(Params...)`可见 `onPostExecute(Result)`。
+- `doInBackground(Params...)`呼叫之前的任何记忆效果`publishProgress(Progress...)`对于相应的`onProgressUpdate(Progress...)`呼叫都是可见的 。（但是`doInBackground(Params...)`继续运行，需要注意以后的更新`doInBackground(Params...)` 不会干扰正在进行的`onProgressUpdate(Progress...)`呼叫。）
+- 呼叫之前，`cancel(boolean)`之后`isCancelled()`的结果或在呼叫之后的结果之后，返回true的任何内存效果都是可见的`onCancelled()`。
+
+# 执行顺序
+
+首次引入时，AsyncTasks在单个后台线程上串行执行。从开始`Build.VERSION_CODES.DONUT`，它已更改为线程池，允许多个任务并行运行。从开始 `Build.VERSION_CODES.HONEYCOMB`，任务在单个线程上执行，以避免并行执行引起的常见应用程序错误。
+
+如果你真的想并行执行，你可以调用 `executeOnExecutor(java.util.concurrent.Executor, java.lang.Object[])`与 `THREAD_POOL_EXECUTOR`。
+
+
+
+
+
+# 实例一
+
+```java
+package com.zzu.rensiyu.test;
+
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+
+public class MainActivity extends AppCompatActivity {
+
+    private Button button;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        button = findViewById(R.id.btn);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 12 传递到doInBackground中，以数组的形式
+                new TestTask().execute(12); 
+            }
+        });
+    }
+
+    private class TestTask extends AsyncTask<Integer, Void, String> {
+
+        //执行异步任务，耗时工作，接受第一个参数，返回第三个参数
+        @Override
+        protected String doInBackground(Integer... integers) {
+            Log.d("TAG", "传进来数字" + integers[0]);
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            //返回到主线程
+            return "传进来数字:" + integers[0];
+        }
+
+        //切换到主线程中
+        @Override
+        protected void onPostExecute(String s) {
+            button.setText(s);
+        }
+    }
+
+}
+
+```
+
+<img src="assets/GIF.gif" alt="GIF" style="zoom:50%;" />
+
+ 
